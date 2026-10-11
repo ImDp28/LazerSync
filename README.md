@@ -7,19 +7,7 @@
 A full-stack MERN application with real-time sync, AI receipt scanning, email-OTP authentication,
 and a financial ledger built on integer arithmetic — so the numbers always add up to the last paisa.
 
-[![Live App](https://img.shields.io/badge/Live%20Demo-Open%20App-10b981?style=for-the-badge)](https://expense-splitter-frontend-mqg9.onrender.com)
-[![API](https://img.shields.io/badge/API-Live-3b82f6?style=for-the-badge)](https://expense-splitter-wenb.onrender.com)
 
-![React](https://img.shields.io/badge/React_19-20232A?style=flat-square&logo=react&logoColor=61DAFB)
-![JavaScript](https://img.shields.io/badge/JavaScript-3178C6?style=flat-square&logo=javascript&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white)
-![Express](https://img.shields.io/badge/Express_5-000000?style=flat-square&logo=express&logoColor=white)
-![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white)
-![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=flat-square&logo=socket.io&logoColor=white)
-![Tailwind](https://img.shields.io/badge/Tailwind_v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
-![Gemini](https://img.shields.io/badge/Gemini_AI-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)
-
-🔗 **Live App:** https://expense-splitter-frontend-mqg9.onrender.com &nbsp;·&nbsp; **API:** https://expense-splitter-wenb.onrender.com
 
 </div>
 
@@ -30,15 +18,11 @@ and a financial ledger built on integer arithmetic — so the numbers always add
 - [The Problem](#-the-problem)
 - [Feature Highlights](#-feature-highlights)
 - [Engineering Highlights](#-engineering-highlights)
-- [Architecture](#-architecture)
 - [Tech Stack](#-tech-stack)
 - [Data Model](#-data-model)
-- [API Reference](#-api-reference)
-- [Real-Time Events](#-real-time-events)
 - [Getting Started](#-getting-started)
 - [Environment Variables](#-environment-variables)
 - [Project Structure](#-project-structure)
-- [Deployment](#-deployment)
 - [Roadmap](#-roadmap)
 - [Author](#-author)
 
@@ -91,11 +75,6 @@ The user never sees a failure mode; the graceful degradation is invisible.
 - **Two-phase confirmation** — a settlement is created as `PENDING` and only affects balances once the **receiver** approves it. Rejection is one tap away.
 - **Fraud-resistant** — you can only record a settlement *you* paid, and only the receiver can approve or reject it.
 
-### ⚡ Real-Time Everything
-Socket.IO rooms per group *and* per user. When anyone adds an expense, joins a group, or approves a
-settlement, every other participant's dashboard and ledger update **instantly** — no refresh, no polling.
-
----
 
 ## 🧠 Engineering Highlights
 
@@ -181,69 +160,9 @@ while hiding them from every query. Historical balances stay reconstructable.
 
 ---
 
-## 🏗 Architecture
 
-```mermaid
-graph TB
-    subgraph Client["🖥️ React 19 SPA — Vite + Tailwind v4"]
-        UI[Pages: Login · Register · Dashboard · Group Details]
-        CTX[AuthContext + ProtectedRoute]
-        AX[Axios instance · JWT interceptors]
-        WS[Socket.IO client]
-    end
 
-    subgraph Server["⚙️ Express 5 API — JavaScript"]
-        MW[Middleware: protect · requireGroupMember · multer]
-        AUTH[authController]
-        GRP[groupController]
-        EXP[expenseController]
-        ALGO[["minimizeCashFlow()<br/>money.js — integer paise"]]
-        IO[Socket.IO server · group + user rooms]
-    end
 
-    subgraph External["☁️ External Services"]
-        DB[(MongoDB Atlas)]
-        MAIL[Nodemailer / Gmail SMTP]
-        AI[Google Gemini 2.5 Flash]
-        OCR[OCR.space fallback]
-    end
-
-    UI --> CTX --> AX -->|"HTTPS · Bearer JWT"| MW
-    WS <-->|"WebSocket"| IO
-    MW --> AUTH & GRP & EXP
-    EXP --> ALGO
-    AUTH & GRP & EXP --> DB
-    AUTH & GRP --> MAIL
-    EXP -->|"Plan A"| AI
-    EXP -.->|"Plan B on failure"| OCR
-    AUTH & GRP & EXP -.->|"emit"| IO
-```
-
-### Settlement lifecycle
-
-```mermaid
-sequenceDiagram
-    participant A as 👤 Debtor
-    participant API as ⚙️ API
-    participant DB as 🗄️ MongoDB
-    participant IO as ⚡ Socket.IO
-    participant B as 👤 Creditor
-
-    A->>API: GET /expenses/group/:id/settle-plan
-    API->>DB: Load expenses → net balances
-    API->>API: minimizeCashFlow()
-    API-->>A: Optimal plan + receiver's UPI ID
-    A->>A: Scan UPI QR → pay outside the app
-    A->>API: POST /expenses/settle
-    API->>API: Verify payerId === caller
-    API->>DB: Create SETTLEMENT (status = PENDING)
-    API->>IO: group_data_changed + dashboard_update
-    IO-->>B: 🔔 Live update
-    B->>API: PUT /expenses/:id/approve
-    API->>DB: Atomic CAS → SETTLED
-    API->>IO: Broadcast to both parties
-    IO-->>A: ✅ Balance cleared
-```
 
 ---
 
@@ -258,10 +177,6 @@ sequenceDiagram
 - Tailwind CSS v4 (`@tailwindcss/vite`)
 - React Router 7
 - Axios (interceptor-based auth)
-- Socket.IO client
-- `qrcode.react` — UPI deep-link QR
-- `lucide-react` — icons
-- ESLint 10 + javascript-eslint
 
 </td><td valign="top" width="50%">
 
@@ -334,92 +249,8 @@ between two sources of truth.
 
 ---
 
-## 📡 API Reference
 
-Base URL: `/api` · All protected routes require `Authorization: Bearer <token>`
 
-### Auth — `/api/auth`
-| Method | Endpoint | Auth | Description |
-|---|---|:--:|---|
-| `POST` | `/send-otp` | — | Email a 6-digit OTP (rejects already-registered non-guest emails) |
-| `POST` | `/verify-otp` | — | Verify OTP → register **or claim a shadow profile** → returns JWT |
-| `POST` | `/login` | — | Email + password → JWT (guests are redirected to sign-up) |
-| `GET` | `/profile` | 🔒 | Current user, password excluded |
-| `PUT` | `/update-upi` | 🔒 | Save the UPI ID used for QR generation |
-
-### Groups — `/api/groups`
-| Method | Endpoint | Auth | Description |
-|---|---|:--:|---|
-| `POST` | `/create` | 🔒 | Create a group (creator auto-added, members de-duplicated) |
-| `GET` | `/my-groups` | 🔒 | All active groups for the user, newest activity first |
-| `PUT` | `/:groupId/add-member` | 🔒 | Add by email — creates a guest profile if they aren't registered, and mails an invite |
-| `DELETE` | `/:groupId` | 🔒 | Creator-only soft delete; **blocked while any balance is outstanding** |
-
-### Expenses — `/api/expenses`
-| Method | Endpoint | Auth | Description |
-|---|---|:--:|---|
-| `POST` | `/add` | 🔒 + 👥 | Create an expense; validates zero-sum payers & splits in paise |
-| `GET` | `/my-expenses` | 🔒 | Every expense the user paid, owes, or created |
-| `GET` | `/group/:groupId` | 🔒 + 👥 | Full group ledger, populated & sorted |
-| `GET` | `/dashboard` | 🔒 | Net summary: *you are owed* / *you owe* / per-friend balances |
-| `GET` | `/group/:groupId/settle-plan` | 🔒 + 👥 | **Minimized** settlement plan incl. payee UPI IDs |
-| `POST` | `/settle` | 🔒 + 👥 | Record a payment you made → `PENDING` |
-| `PUT` | `/:settlementId/approve` | 🔒 | Receiver-only atomic approval → `SETTLED` |
-| `PUT` | `/:settlementId/reject` | 🔒 | Receiver-only atomic rejection → `REJECTED` |
-| `POST` | `/parse-receipt` | 🔒 | Multipart image → `{ title, amount }` via Gemini, OCR fallback |
-
-🔒 = JWT required &nbsp;·&nbsp; 👥 = group membership enforced
-
-<details>
-<summary><b>Example — create a multi-payer, percentage-split expense</b></summary>
-
-```http
-POST /api/expenses/add
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "title": "Goa Beach Resort",
-  "totalAmount": 12000,
-  "groupId": "65f1a2b3c4d5e6f7a8b9c0d1",
-  "splitType": "PERCENTAGE",
-  "payers": [
-    { "user": "65f1...aaa", "amount": 8000 },
-    { "user": "65f1...bbb", "amount": 4000 }
-  ],
-  "splits": [
-    { "user": "65f1...aaa", "amountOwed": 4800 },
-    { "user": "65f1...bbb", "amountOwed": 4800 },
-    { "user": "65f1...ccc", "amountOwed": 2400 }
-  ]
-}
-```
-
-```jsonc
-// 201 Created
-{ "message": "Expense added", "expense": { /* … */ } }
-
-// 400 — the ledger stays zero-sum or the write is rejected
-{ "message": "Payer amounts must add up to the total amount" }
-```
-</details>
-
----
-
-## ⚡ Real-Time Events
-
-| Event | Direction | Purpose |
-|---|---|---|
-| `join_group` | client → server | Subscribe to a group's room (`groupId`) |
-| `join_user_room` | client → server | Subscribe to personal notifications (`userId`) |
-| `group_data_changed` | server → clients | Ledger changed — refetch expenses & settle plan |
-| `dashboard_update` | server → clients | A balance moved — refresh dashboard totals |
-
-Every mutating controller broadcasts to **both** the group room and each affected member's personal
-room, so a change is reflected on the group page *and* on the dashboards of people who aren't
-currently looking at that group.
-
----
 
 ## 🚀 Getting Started
 
@@ -528,24 +359,6 @@ LazerSync-JavaScript/
 
 ---
 
-## 🌐 Deployment
-
-Both services run on **Render**, backed by **MongoDB Atlas**.
-
-| Service | Type | Notes |
-|---|---|---|
-| **Frontend** | Static Site | `npm run build` → publish `dist/`. Set `VITE_API_URL` **at build time** — Vite inlines it into the bundle. |
-| **Backend** | Web Service | `npm install` → `npm start`. Runs JavaScript directly via `node`. |
-| **Database** | MongoDB Atlas | Whitelist Render's egress IPs (or `0.0.0.0/0` for a free tier). |
-
-**Deployment notes worth knowing:**
-- CORS and the Socket.IO handshake share **one config object** — a mismatched `FRONTEND_URL` breaks
-  live updates while REST keeps working, which is a genuinely confusing failure mode.
-- The server listens via `httpServer.listen()`, **not** `app.listen()` — otherwise Socket.IO never
-  attaches to the HTTP server.
-- Render's free tier sleeps after inactivity; the first request may take ~30 seconds to wake.
-
----
 
 ## 🗺 Roadmap
 
@@ -563,9 +376,9 @@ Both services run on **Render**, backed by **MongoDB Atlas**.
 
 ## 👤 Author
 
-**Aman Kumar**
+**Divyaprakash Tiwari**
 
-[![GitHub](https://img.shields.io/badge/GitHub-Amankumar--033-181717?style=flat-square&logo=github)](https://github.com/Amankumar-033)
+
 
 ---
 
